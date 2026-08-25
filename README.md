@@ -1,3 +1,9 @@
+<p align="center">
+  <img src="assets/control-loop.svg"
+       alt="A pulse circulating a PID control loop while the step response settles on its setpoint"
+       width="100%">
+</p>
+
 # UPID
 
 A small, deterministic PID controller. Give it a setpoint, a measurement and an
