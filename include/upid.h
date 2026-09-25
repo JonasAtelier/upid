@@ -69,7 +69,7 @@ struct upid {
 	float prev_o;
 	float integral;
 	upid_mode mode;
-	bool is_auto_pend;
+	bool is_auto_pend;	/* next spin aligns the integral to prev_o */
 	bool is_mea_init;
 	float prev_mea;
 	float filter_mea_rate;
@@ -121,7 +121,11 @@ upid_sta upid_set_auto(struct upid *pid);
 /* Take the output over, clamped to the configured limits. */
 upid_sta upid_set_manual(struct upid *pid, float output);
 
-/* Reset history around known process and output values. */
+/*
+ * Reset history around known process and output values. In automatic mode
+ * the next upid_spin() holds out and aligns the integral to it, so the
+ * output does not jump; in manual mode out becomes the manual output.
+ */
 upid_sta upid_reset(struct upid *pid, float mea, float out);
 
 /* Who owns the output right now. UPID_MANUAL if pid is NULL. */

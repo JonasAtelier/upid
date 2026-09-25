@@ -187,26 +187,6 @@ upid_sta upid_spin(struct upid *pid, float target, float mea, float dt_s)
 	if (!is_finite(err) || !is_finite(p_out))
 		return UPID_EINVAL_INPUT;
 
-	if (pid->is_auto_pend) {
-		/*
-		 * Align the integral term with the manual output so automatic
-		 * control can take ownership without causing an output jump.
-		 */
-		i_out = pid->prev_o - p_out;
-
-		if (!is_finite(i_out))
-			return UPID_EINVAL_INPUT;
-
-		pid->prev_mea = mea;
-		pid->filter_mea_rate = 0.0f;
-		pid->is_mea_init = true;
-		pid->integral = i_out;
-		pid->mode = UPID_AUTO;
-		pid->is_auto_pend = false;
-
-		return UPID_OK;
-	}
-
 	if (pid->is_mea_init) {
 		/*
 		 * Differentiate measurement, not error, to avoid derivative
@@ -263,6 +243,26 @@ upid_sta upid_spin(struct upid *pid, float target, float mea, float dt_s)
 			return UPID_EINVAL_INPUT;
 	}
 
+	if (pid->is_auto_pend) {
+		/*
+		 * Align the integral term with the held output so automatic
+		 * control can take ownership without causing an output jump.
+		 */
+		i_out = pid->prev_o - (p_out - d_out);
+
+		if (!is_finite(i_out))
+			return UPID_EINVAL_INPUT;
+
+		pid->prev_mea = mea;
+		pid->filter_mea_rate = filter_mea_rate;
+		pid->is_mea_init = true;
+		pid->integral = i_out;
+		pid->mode = UPID_AUTO;
+		pid->is_auto_pend = false;
+
+		return UPID_OK;
+	}
+
 	/* integral term */
 	i_out = pid->integral + pid->cfg.ki * err * dt_s;
 
@@ -298,8 +298,10 @@ upid_sta upid_set_auto(struct upid *pid)
 	if (res != UPID_OK)
 		return res;
 
-	if (pid->mode == UPID_MANUAL)
+	if (pid->mode == UPID_MANUAL) {
 		pid->is_auto_pend = true;
+		pid->is_mea_init = false;	/* history went stale in manual */
+	}
 
 	return UPID_OK;
 }
@@ -339,6 +341,10 @@ upid_sta upid_reset(struct upid *pid, float mea, float out)
 	pid->is_mea_init = true;
 	pid->integral = output_candidate;
 	pid->prev_o = output_candidate;
+
+	/* P needs a setpoint, so the next spin finishes the alignment. */
+	if (pid->mode == UPID_AUTO)
+		pid->is_auto_pend = true;
 
 	return UPID_OK;
 }
