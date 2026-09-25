@@ -212,7 +212,18 @@ upid_sta upid_spin(struct upid *pid, float target, float mea, float dt_s)
 		base = ALPHA_UNFILTERED;
 		alpha = ALPHA_UNFILTERED;
 
-		mea_rate = (mea - pid->prev_mea) / dt_s;
+		/*
+		 * A fixed-rate loop would divide by the same dt every cycle,
+		 * so multiply by a 1/dt cached against it. Within 1 ULP of
+		 * the division; dt_s is always above zero, so 0 is a safe
+		 * "nothing cached".
+		 */
+		if (dt_s != pid->inv_dt_dt) {
+			pid->inv_dt = 1.0f / dt_s;
+			pid->inv_dt_dt = dt_s;
+		}
+
+		mea_rate = (mea - pid->prev_mea) * pid->inv_dt;
 
 		if (!is_finite(mea_rate))
 			return UPID_EINVAL_INPUT;
@@ -445,6 +456,8 @@ static void state_reset(struct upid *pid)
 	pid->filter_mea_rate = 0.0f;
 	pid->alpha_dt = ALPHA_UNCACHED;
 	pid->alpha = 0.0f;
+	pid->inv_dt_dt = 0.0f;
+	pid->inv_dt = 0.0f;
 }
 
 upid_sta upid_create(struct upid *pid, const struct upid_cfg *cfg)

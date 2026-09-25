@@ -78,6 +78,8 @@ struct upid {
 	float filter_mea_rate;
 	float alpha_dt;		/* dt the cached filter coefficient belongs to */
 	float alpha;		/* cached first-order filter coefficient */
+	float inv_dt_dt;	/* dt the cached 1/dt belongs to */
+	float inv_dt;		/* cached 1/dt */
 };
 
 /*
