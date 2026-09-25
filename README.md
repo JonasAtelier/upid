@@ -35,6 +35,8 @@ other sources. That is the whole install.
 
 C++ can include the header directly; it carries an `extern "C"` block.
 
+What changed in each version: [Releases](https://github.com/JonasAtelier/upid/releases).
+
 ## Use
 
 ```c
