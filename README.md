@@ -216,6 +216,31 @@ accumulating integral** that would push further into the limit, but still accept
 accumulation coming back out. Without that, the integral winds up during saturation
 and the loop stays pinned to the rail long after the error reverses.
 
+### `o_rate_max` — how fast the output may move
+
+A slew limit, in output units per second. Zero disables it. Each cycle the output
+moves at most `o_rate_max * dt_s` from the last one, after the clamp to `o_min` /
+`o_max`. Use it for an actuator that must not be yanked — a motor that trips its
+supply on a step, a valve that hammers the pipe.
+
+Integration pauses while the limit holds the output back, the same rule as
+saturation, so the integral does not wind up behind a slow ramp.
+
+It only limits what `upid_spin()` produces in automatic mode. `upid_set_manual()`,
+`upid_reset()` and a `upid_set_cfg()` that narrows the limits move the output at once.
+Back in automatic, the first cycle holds the output and the ramp starts from there.
+
+### `kt` — back-calculation anti-windup
+
+The default anti-windup is on or off: at a limit the integral stops. `kt`, in 1/s,
+replaces that with a gradual pull. The integral keeps running, and each cycle it also
+gives back `kt * (applied - wanted) * dt_s` — the part of the output the limits or the
+slew rate refused. Zero keeps the on/off rule.
+
+While limited, the wanted output settles only `ki * error / kt` past the limit, so the
+loop leaves the rail soon after the error turns. A starting point is `kt = ki / kp`.
+Keep `kt * dt_s` at or below 1: above that it overcorrects every cycle.
+
 ### `dir` — which way is up
 
 | `dir` | Use when | Examples |
@@ -226,6 +251,18 @@ and the loop stays pinned to the rail long after the error reverses.
 > **Get this right before touching gains.** Backwards `dir` drives the loop *away*
 > from the setpoint and into a rail. If the system runs off the instant you enable it,
 > check this first, not `kp`.
+
+### `err_deadzone` — close enough is close enough
+
+A band around the setpoint, in measurement units, where P and I stop pushing. Zero
+disables it. Use it when holding exactly on target costs more than it is worth — a
+valve or motor that wears out hunting over the last fraction of a degree.
+
+Inside the band the error counts as zero. Outside it, the band is subtracted rather
+than the error passing through whole, so the push grows from zero at the edge instead
+of jumping by `kp * err_deadzone` there — a jump that makes the loop chatter in and
+out of the band. The price is that the loop settles anywhere inside it, and `ki` no
+longer removes that last bit of error. D is untouched: it works on the measurement.
 
 ## Cheat sheet
 
@@ -286,14 +323,16 @@ state for interrupts — ESP-IDF, by default, is one. There, spin from a task in
 
 ## Cost per update
 
-Counted from `upid_spin()` compiled at `-O2`, and measured on a host:
+Counted statically from `upid_spin()` compiled at `-O2` on an x86-64 host (GCC 13),
+leaving out the code `err_deadzone`, `o_rate_max` and `kt` skip while they are zero:
 
 | | |
 |---|---|
-| Instructions | ~180 |
+| Instructions | ~195 |
 | Floating-point compares | 11 |
-| Floating-point add / sub / mul | 16 |
-| Floating-point divides | 1 on a fixed-rate loop, 2 when `dt` changes |
+| Floating-point add / sub / mul | 18 |
+| Floating-point divides | 0 on a fixed-rate loop, 2 when `dt` changes |
+| Counting the code those three enable | ~240 instructions, 14 compares, 28 add / sub / mul |
 
 **Estimated 1–1.5 µs on an ESP32-S3 at 240 MHz** — an op-count estimate against
 Xtensa LX7 timings, not a hardware measurement. That is ~0.1% of one core at 1 kHz;
@@ -301,5 +340,9 @@ an I2C sensor read costs 50–500× more.
 
 No `double` on this path, which matters where double precision is emulated. Two things
 make it slower: running from flash rather than IRAM, where a cache miss dwarfs the
-arithmetic, and a `dt` that changes every cycle, which stops the filter coefficient
-being reused.
+arithmetic, and a `dt` that changes every cycle, which stops the cached `1/dt` and
+filter coefficient being reused.
+
+The derivative multiplies by that cached `1/dt` rather than dividing by `dt`. The two
+differ by at most 1 ULP: checked over every float `dt` from 0.1 ms to 1 s, about 23% of
+rates come out one step apart and none further.
