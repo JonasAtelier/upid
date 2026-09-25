@@ -59,7 +59,8 @@ static bool is_cfg_finite(const struct upid_cfg *cfg)
 {
 	return (is_finite(cfg->kp) && is_finite(cfg->ki) &&
 		is_finite(cfg->kd) && is_finite(cfg->o_min) &&
-		is_finite(cfg->o_max) && is_finite(cfg->d_filter_tau));
+		is_finite(cfg->o_max) && is_finite(cfg->d_filter_tau) &&
+		is_finite(cfg->err_deadzone));
 }
 
 static upid_sta is_cfg_valid(const struct upid_cfg *cfg)
@@ -69,6 +70,7 @@ static upid_sta is_cfg_valid(const struct upid_cfg *cfg)
 
 	if (cfg->kp < 0.0f || cfg->ki < 0.0f || cfg->kd < 0.0f ||
 	    cfg->d_filter_tau < 0.0f ||
+	    cfg->err_deadzone < 0.0f ||
 	    (cfg->dir != UPID_DIRECT && cfg->dir != UPID_REVERSE) ||
 	    !(cfg->o_min < cfg->o_max))
 		return UPID_EINVAL_CFG;
@@ -177,6 +179,20 @@ upid_sta upid_spin(struct upid *pid, float target, float mea, float dt_s)
 
 	sign = (pid->cfg.dir == UPID_DIRECT) ? SIGN_DIRECT : SIGN_REVERSE;
 	err = sign * (target - mea);
+
+	/*
+	 * Shrink the error by the deadzone rather than zeroing it inside,
+	 * so P does not step by kp * err_deadzone at the edge. D works on
+	 * the measurement and never sees it.
+	 */
+	if (pid->cfg.err_deadzone != 0.0f) {
+		if (err > pid->cfg.err_deadzone)
+			err -= pid->cfg.err_deadzone;
+		else if (err < -pid->cfg.err_deadzone)
+			err += pid->cfg.err_deadzone;
+		else
+			err = 0.0f;
+	}
 
 	/* proportional term */
 	p_out = pid->cfg.kp * err;
@@ -378,6 +394,7 @@ upid_sta upid_cfg_init(struct upid_cfg *cfg)
 	cfg->o_max = DEFAULT_O_MAX;
 	cfg->d_filter_tau = 0.0f;
 	cfg->dir = UPID_DIRECT;
+	cfg->err_deadzone = 0.0f;
 
 	return UPID_OK;
 }
