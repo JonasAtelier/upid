@@ -1,6 +1,5 @@
 #include "upid.h"
 
-#include <float.h>
 #include <math.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -117,7 +116,7 @@ upid_sta upid_set_cfg(struct upid *pid, const struct upid_cfg *cfg)
 {
 	upid_sta res;
 	float output_candidate;
-	double adjusted_integral;
+	float adjusted_integral;
 
 	if (!pid || !cfg)
 		return UPID_EINVAL_INPUT;
@@ -132,17 +131,15 @@ upid_sta upid_set_cfg(struct upid *pid, const struct upid_cfg *cfg)
 		return res;
 
 	output_candidate = clamp_output(pid->prev_o, cfg);
-	adjusted_integral = (double)pid->integral +
-			    (double)output_candidate -
-			    (double)pid->prev_o;
+	adjusted_integral = pid->integral + (output_candidate - pid->prev_o);
 
-	if (adjusted_integral > FLT_MAX || adjusted_integral < -FLT_MAX)
+	if (!is_finite(adjusted_integral))
 		return UPID_EINVAL_INPUT;
 
 	pid->cfg = *cfg;
 	pid->alpha_dt = ALPHA_UNCACHED;	/* tau may have moved; recompute it */
 	pid->prev_o = output_candidate;
-	pid->integral = (float)adjusted_integral;
+	pid->integral = adjusted_integral;
 	pid->sta = UPID_OK;
 
 	return UPID_OK;

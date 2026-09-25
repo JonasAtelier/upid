@@ -64,7 +64,7 @@ int main(void)
 
 		if (step % 200 == 0)
 			printf("t=%5.2fs  measurement=%7.3f  output=%7.3f\n",
-			       step * dt_s, (double)read_measurement(),
+			       (double)(step * dt_s), (double)read_measurement(),
 			       (double)output);
 	}
 

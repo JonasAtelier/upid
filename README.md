@@ -31,8 +31,7 @@ other sources. That is the whole install.
   Take `dt` from `micros()`.
 - **ESP-IDF** — drop into a component and list `upid.c` in
   `idf_component_register(SRCS ...)`. Take `dt` from `esp_timer_get_time()`.
-- **Anything else** — add `upid.c` to your build. Needs C99, `<math.h>`,
-  `<float.h>`.
+- **Anything else** — add `upid.c` to your build. Needs C99 and `<math.h>`.
 
 C++ can include the header directly; it carries an `extern "C"` block.
 
