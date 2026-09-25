@@ -52,6 +52,7 @@ struct upid_cfg {
 	float d_filter_tau;	/* derivative filter tau; 0 disables filtering */
 	upid_dir dir;
 	float err_deadzone;	/* error band P and I ignore; 0 disables it */
+	float o_rate_max;	/* output slew limit per second; 0 disables it */
 };
 
 /*
@@ -80,7 +81,7 @@ struct upid {
 
 /*
  * Load default tuning into cfg: gains zero, output range 0 to 1, no
- * derivative filter, direct acting, no deadzone.
+ * derivative filter, direct acting, no deadzone, no slew limit.
  *
  * Start here rather than from a zeroed struct - o_min < o_max is required,
  * so all-zero is not a valid cfg:

@@ -60,7 +60,7 @@ static bool is_cfg_finite(const struct upid_cfg *cfg)
 	return (is_finite(cfg->kp) && is_finite(cfg->ki) &&
 		is_finite(cfg->kd) && is_finite(cfg->o_min) &&
 		is_finite(cfg->o_max) && is_finite(cfg->d_filter_tau) &&
-		is_finite(cfg->err_deadzone));
+		is_finite(cfg->err_deadzone) && is_finite(cfg->o_rate_max));
 }
 
 static upid_sta is_cfg_valid(const struct upid_cfg *cfg)
@@ -71,6 +71,7 @@ static upid_sta is_cfg_valid(const struct upid_cfg *cfg)
 	if (cfg->kp < 0.0f || cfg->ki < 0.0f || cfg->kd < 0.0f ||
 	    cfg->d_filter_tau < 0.0f ||
 	    cfg->err_deadzone < 0.0f ||
+	    cfg->o_rate_max < 0.0f ||
 	    (cfg->dir != UPID_DIRECT && cfg->dir != UPID_REVERSE) ||
 	    !(cfg->o_min < cfg->o_max))
 		return UPID_EINVAL_CFG;
@@ -155,6 +156,7 @@ upid_sta upid_spin(struct upid *pid, float target, float mea, float dt_s)
 {
 	float sign, err, p_out, i_out, d_out, output;
 	float mea_rate, filter_mea_rate, alpha, base;
+	float applied, o_step;
 	upid_sta res;
 
 	res = is_ready(pid);
@@ -287,16 +289,30 @@ upid_sta upid_spin(struct upid *pid, float target, float mea, float dt_s)
 	if (!is_finite(output))
 		return UPID_EINVAL_INPUT;
 
+	applied = clamp_output(output, &pid->cfg);
+
+	/*
+	 * Slew limit, after the clamp. prev_o is already inside the limits,
+	 * so moving toward the clamped value cannot leave them.
+	 */
+	if (pid->cfg.o_rate_max != 0.0f) {
+		o_step = pid->cfg.o_rate_max * dt_s;
+
+		if (applied > pid->prev_o + o_step)
+			applied = pid->prev_o + o_step;
+		else if (applied < pid->prev_o - o_step)
+			applied = pid->prev_o - o_step;
+	}
+
 	/*
 	 * Conditional integration blocks windup but permits movement back
-	 * from saturation toward the configured output range.
+	 * from saturation or a slew limit toward the applied output.
 	 */
-	if ((output >= pid->cfg.o_min && output <= pid->cfg.o_max) ||
-	    (output > pid->cfg.o_max && err < 0.0f) ||
-	    (output < pid->cfg.o_min && err > 0.0f))
+	if (!((output > applied && err >= 0.0f) ||
+	      (output < applied && err <= 0.0f)))
 		pid->integral = i_out;
 
-	pid->prev_o = clamp_output(output, &pid->cfg);
+	pid->prev_o = applied;
 	pid->is_mea_init = true;
 	pid->prev_mea = mea;
 	pid->filter_mea_rate = filter_mea_rate;
@@ -395,6 +411,7 @@ upid_sta upid_cfg_init(struct upid_cfg *cfg)
 	cfg->d_filter_tau = 0.0f;
 	cfg->dir = UPID_DIRECT;
 	cfg->err_deadzone = 0.0f;
+	cfg->o_rate_max = 0.0f;
 
 	return UPID_OK;
 }
