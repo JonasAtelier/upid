@@ -60,7 +60,8 @@ static bool is_cfg_finite(const struct upid_cfg *cfg)
 	return (is_finite(cfg->kp) && is_finite(cfg->ki) &&
 		is_finite(cfg->kd) && is_finite(cfg->o_min) &&
 		is_finite(cfg->o_max) && is_finite(cfg->d_filter_tau) &&
-		is_finite(cfg->err_deadzone) && is_finite(cfg->o_rate_max));
+		is_finite(cfg->err_deadzone) && is_finite(cfg->o_rate_max) &&
+		is_finite(cfg->kt));
 }
 
 static upid_sta is_cfg_valid(const struct upid_cfg *cfg)
@@ -72,6 +73,7 @@ static upid_sta is_cfg_valid(const struct upid_cfg *cfg)
 	    cfg->d_filter_tau < 0.0f ||
 	    cfg->err_deadzone < 0.0f ||
 	    cfg->o_rate_max < 0.0f ||
+	    cfg->kt < 0.0f ||
 	    (cfg->dir != UPID_DIRECT && cfg->dir != UPID_REVERSE) ||
 	    !(cfg->o_min < cfg->o_max))
 		return UPID_EINVAL_CFG;
@@ -305,10 +307,22 @@ upid_sta upid_spin(struct upid *pid, float target, float mea, float dt_s)
 	}
 
 	/*
+	 * Back-calculation: with kt set, always integrate, and bleed off
+	 * the part of the output the limits did not let through.
+	 */
+	if (pid->cfg.kt != 0.0f) {
+		i_out += pid->cfg.kt * (applied - output) * dt_s;
+
+		if (!is_finite(i_out))
+			return UPID_EINVAL_INPUT;
+	}
+
+	/*
 	 * Conditional integration blocks windup but permits movement back
 	 * from saturation or a slew limit toward the applied output.
 	 */
-	if (!((output > applied && err >= 0.0f) ||
+	if (pid->cfg.kt != 0.0f ||
+	    !((output > applied && err >= 0.0f) ||
 	      (output < applied && err <= 0.0f)))
 		pid->integral = i_out;
 
@@ -412,6 +426,7 @@ upid_sta upid_cfg_init(struct upid_cfg *cfg)
 	cfg->dir = UPID_DIRECT;
 	cfg->err_deadzone = 0.0f;
 	cfg->o_rate_max = 0.0f;
+	cfg->kt = 0.0f;
 
 	return UPID_OK;
 }

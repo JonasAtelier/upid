@@ -53,6 +53,7 @@ struct upid_cfg {
 	upid_dir dir;
 	float err_deadzone;	/* error band P and I ignore; 0 disables it */
 	float o_rate_max;	/* output slew limit per second; 0 disables it */
+	float kt;		/* windup tracking gain, 1/s; 0 disables it */
 };
 
 /*
