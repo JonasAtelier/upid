@@ -66,6 +66,9 @@ than running on bad numbers.
 > **`dt_s` is seconds.** Divide milliseconds by `1000.0f`, microseconds by
 > `1000000.0f`. Must be finite and greater than zero.
 
+A call that returns an error leaves the output where it was: `upid_get_output()` still
+holds the last good value.
+
 Runnable version driving a simulated plant:
 
 ```sh
@@ -276,6 +279,10 @@ No global state, so two controllers in two tasks need no coordination. A single
 controller is not internally locked: if one task calls `upid_spin()` while another
 calls `upid_set_cfg()` or `upid_reset()` on it, guard that yourself. One controller
 per loop, driven by the task owning that loop, needs nothing.
+
+Interrupt handlers are fine too: no call blocks, allocates, or touches global state, and
+`upid_spin()` runs in bounded time. It does use the FPU, and some ports do not save FPU
+state for interrupts — ESP-IDF, by default, is one. There, spin from a task instead.
 
 ## Cost per update
 

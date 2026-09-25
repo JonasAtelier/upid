@@ -112,7 +112,10 @@ const struct upid_cfg *upid_get_cfg(const struct upid *pid);
 /* Validate and apply new tuning, preserving controller state. */
 upid_sta upid_set_cfg(struct upid *pid, const struct upid_cfg *cfg);
 
-/* Process one sample. dt_s is the elapsed time in seconds. */
+/*
+ * Process one sample. dt_s is the elapsed time in seconds. On any error
+ * the output holds its previous value.
+ */
 upid_sta upid_spin(struct upid *pid, float target, float mea, float dt_s);
 
 /* Hand the output back to the PID, with a bumpless transition. */
