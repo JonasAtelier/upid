@@ -38,6 +38,8 @@ Compile [src/upid.c](src/upid.c) with your application and add [include/](includ
 
 ## Choose a tuning parameter
 
+![Heater simulation over 20 seconds. With integral gain 0.5 the measurement reaches 50.016. With integral gain zero it settles at 48.571 against a target of 50.](assets/heater-response.png)
+
 | What you observe | Where to start |
 | --- | --- |
 | The output responds weakly to a large error | Adjust `kp`, the response to the current error. |
