@@ -51,4 +51,4 @@ The [tuning guide](TUNING.md) includes gain sweeps, measured overshoot, and a tr
 
 ## Reference
 
-[API and return codes](include/upid.h) · [Releases](https://github.com/JonasAtelier/upid/releases) · [MIT license](LICENSE) · [Jonas Atelier library index](https://github.com/JonasAtelier/jonas-atelier-libraries#library-search)
+[API and return codes](include/upid.h) · [Releases](https://github.com/JonasAtelier/upid/releases) · [GPL-3.0-only license](LICENSE) · [Jonas Atelier library index](https://github.com/JonasAtelier/jonas-atelier-libraries#library-search)
